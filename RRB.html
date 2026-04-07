@@ -1,0 +1,230 @@
+index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>🔥 Ultimate Space Battle</title>
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  background: radial-gradient(circle, #000010, #000000);
+  color: white;
+  font-family: Arial;
+}
+canvas { display: block; }
+
+#ui {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 18px;
+}
+
+#gameOver {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  display: none;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 18px;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<div id="ui">
+Score: <span id="score">0</span> |
+Health: <span id="health">100</span> |
+Level: <span id="level">1</span>
+</div>
+
+<div id="gameOver">
+<h1>💀 Game Over</h1>
+<p id="finalScore"></p>
+<button onclick="restartGame()">Restart</button>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+let game = {
+  score: 0,
+  health: 100,
+  level: 1,
+  running: true
+};
+
+let player = {
+  x: canvas.width/2,
+  y: canvas.height - 100,
+  size: 20,
+  speed: 6
+};
+
+let bullets = [];
+let enemies = [];
+let particles = [];
+
+let keys = {};
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+// Shooting
+let shootCooldown = 0;
+
+function shoot() {
+  bullets.push({x: player.x, y: player.y, vx: 0, vy: -8});
+}
+
+// Enemy spawn
+function spawnEnemy() {
+  let type = Math.random();
+  if(type < 0.7) {
+    enemies.push({x: Math.random()*canvas.width, y: 0, size: 20, speed: 2});
+  } else {
+    enemies.push({x: Math.random()*canvas.width, y: 0, size: 30, speed: 1});
+  }
+}
+
+setInterval(spawnEnemy, 800);
+
+// Particle explosion
+function createExplosion(x,y) {
+  for(let i=0;i<10;i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random()-0.5)*5,
+      vy: (Math.random()-0.5)*5,
+      life: 30
+    });
+  }
+}
+
+function update() {
+  if(!game.running) return;
+
+  // Movement
+  if(keys["a"] || keys["ArrowLeft"]) player.x -= player.speed;
+  if(keys["d"] || keys["ArrowRight"]) player.x += player.speed;
+  if(keys["w"] || keys["ArrowUp"]) player.y -= player.speed;
+  if(keys["s"] || keys["ArrowDown"]) player.y += player.speed;
+
+  // Boundaries
+  player.x = Math.max(0, Math.min(canvas.width, player.x));
+  player.y = Math.max(0, Math.min(canvas.height, player.y));
+
+  // Shooting
+  if(shootCooldown <= 0) {
+    shoot();
+    shootCooldown = 15;
+  }
+  shootCooldown--;
+
+  // Bullets
+  bullets = bullets.filter(b => {
+    b.y += b.vy;
+    return b.y > 0;
+  });
+
+  // Enemies
+  enemies = enemies.filter(e => {
+    e.y += e.speed + game.level*0.2;
+
+    // Collision with player
+    if(Math.abs(e.x-player.x)<20 && Math.abs(e.y-player.y)<20){
+      game.health -= 20;
+      createExplosion(e.x,e.y);
+      if(game.health <= 0) endGame();
+      return false;
+    }
+
+    // Bullet collision
+    for(let b of bullets){
+      if(Math.abs(e.x-b.x)<15 && Math.abs(e.y-b.y)<15){
+        game.score += 10;
+        createExplosion(e.x,e.y);
+        bullets.splice(bullets.indexOf(b),1);
+        return false;
+      }
+    }
+
+    return e.y < canvas.height;
+  });
+
+  // Particles
+  particles = particles.filter(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    return p.life > 0;
+  });
+
+  // Level up
+  if(game.score > game.level * 200){
+    game.level++;
+  }
+
+  // UI update
+  document.getElementById("score").innerText = game.score;
+  document.getElementById("health").innerText = game.health;
+  document.getElementById("level").innerText = game.level;
+}
+
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Player
+  ctx.fillStyle="white";
+  ctx.fillRect(player.x-10, player.y-10, player.size, player.size);
+
+  // Bullets
+  ctx.fillStyle="red";
+  bullets.forEach(b => ctx.fillRect(b.x,b.y,5,10));
+
+  // Enemies
+  ctx.fillStyle="lime";
+  enemies.forEach(e => ctx.fillRect(e.x,e.y,e.size,e.size));
+
+  // Particles
+  ctx.fillStyle="orange";
+  particles.forEach(p => ctx.fillRect(p.x,p.y,3,3));
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function endGame(){
+  game.running=false;
+  document.getElementById("gameOver").style.display="block";
+  document.getElementById("finalScore").innerText="Score: "+game.score;
+}
+
+function restartGame(){
+  location.reload();
+}
+
+loop();
+</script>
+
+</body>
+</html>
